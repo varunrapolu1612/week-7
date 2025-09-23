@@ -17,14 +17,22 @@ This week is meant to give you a very basic introduction to ... In particular, w
 The environment for this week is built with the following environment.yml:
 
 ```yml
-name: coding-exercise
+name: week-7
 dependencies:
   - python=3.11
   - pip
   - pip:
+    - ipykernel  # for Jupyter Notebook
     - streamlit
+    - seaborn
     - pandas
     - numpy
+    - lxml
+    - networkx
+    - geopy
+    - haversine
+    - plotly
+    - nbformat
 ```
 
 *Note: you are welcome to install more packages in your codespace, but they will not be used by the autograder.*
