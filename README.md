@@ -1,9 +1,10 @@
-# Week 0
+# Week 7
 
 This week is meant to give you a very basic introduction to ... In particular, we will focus on the following:
 
-- XXX
-- XXX
+- Networks
+- Mapping
+- Debugging and Unit Testing
 
 ## Setup
 
