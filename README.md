@@ -1,9 +1,9 @@
 # Week 7
 
-This week is meant to give you a very basic introduction to ... In particular, we will focus on the following:
+This week is meant to give you a basic introduction to analyzing graph data as well as *geo*graphical data. Also, we will spend time on debugging, exceptions, and unit testing. In particular, we will focus on the following:
 
-- Networks
-- Mapping
+- Networks and graphs
+- Mapping geocoded data
 - Debugging and Unit Testing
 
 ## Setup
