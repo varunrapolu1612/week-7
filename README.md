@@ -4,7 +4,7 @@ This week is meant to give you a basic introduction to analyzing graph data as w
 
 - Networks and graphs
 - Mapping geocoded data
-- Debugging and Unit Testing
+- Debugging, Exceptions, and Unit Testing
 
 ## Setup
 
