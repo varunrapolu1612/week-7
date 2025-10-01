@@ -9,6 +9,7 @@ class TestLoader(unittest.TestCase):
 
     def test_valid_locations(self):
         # your code here
+        return None
 
     def test_invalid_location(self):
         result = fetch_location_data(self.geolocator, "asdfqwer1234")
