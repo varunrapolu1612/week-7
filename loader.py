@@ -4,9 +4,10 @@ Script to load geographical data into a pandas DataFrame, and save it as a CSV f
 
 from geopy.geocoders import Nominatim
 import pandas as pd
+import time
 
 
-def get_geolocator(agent='h501-student'):
+def get_geolocator(agent='h501-student', timeout=10):#added timeout parameter
     """
     Initiate a Nominatim geolocator instance given an `agent`.
 
@@ -17,16 +18,28 @@ def get_geolocator(agent='h501-student'):
     """
     return Nominatim(user_agent=agent)
 
-def fetch_location_data(geolocator, loc):
-    location = geolocator.geocode(loc)
+def fetch_location_data(geolocator, loc, attempts=3): #added attempts parameter to handle Franklin's Barbecue
+    for _ in range(attempts):
+        try:
+            location = geolocator.geocode(loc)
 
-    if location is None:
-        return None
+            if location is None:
+                return {"location": loc, "latitude": None, "longitude": None, "type": None}
     
-    return {"location": loc, "latitude": location.latitude, "longitude": location.longitude, "type": location.geo_type}
+            return {"location": loc, "latitude": location.latitude, "longitude": location.longitude, "type": location.raw.get('type', None)}
+        except Exception as e:
+            print(f" {attempts} Attempts  failed for '{loc}': {e}")
+            time.sleep(2)
 
-def build_geo_dataframe(locations):
-    geo_data = [fetch_location_data(geolocator, loc) for loc in locations]
+        print(f"Failed to fetch '{loc}' after {attempts} attempts.")
+        return None
+
+
+def build_geo_dataframe(geolocator, locations):
+
+    geo_data = [location_data for loc in locations
+        if (location_data := fetch_location_data(geolocator, loc)) is not None
+]
     
     return pd.DataFrame(geo_data)
 
@@ -36,6 +49,6 @@ if __name__ == "__main__":
 
     locations = ["Museum of Modern Art", "iuyt8765(*&)", "Alaska", "Franklin's Barbecue", "Burj Khalifa"]
 
-    df = build_geo_dataframe(locations)
+    df = build_geo_dataframe(geo,locations)
 
     df.to_csv("./geo_data.csv")
