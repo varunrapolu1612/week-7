@@ -3,52 +3,57 @@ Script to load geographical data into a pandas DataFrame, and save it as a CSV f
 '''
 
 from geopy.geocoders import Nominatim
+from geopy.exc import GeocoderTimedOut, GeocoderServiceError
 import pandas as pd
-import time
 
 
-def get_geolocator(agent='h501-student', timeout=10):#added timeout parameter
-    """
-    Initiate a Nominatim geolocator instance given an `agent`.
-
-    Parameters
-    ----------
-    agent : str, optional
-        Agent name for Nominatim, by default 'h501-student'
-    """
+def get_geolocator(agent='h501-student'):
     return Nominatim(user_agent=agent)
 
-def fetch_location_data(geolocator, loc, attempts=3): #added attempts parameter to handle Franklin's Barbecue
-    for _ in range(attempts):
-        try:
-            location = geolocator.geocode(loc)
 
-            if location is None:
-                return {"location": loc, "latitude": None, "longitude": None, "type": None}
+def fetch_location_data(geolocator, loc):
+    """
+    Fetches geographical data for a given location string.
+    """
+    try:
+        location = geolocator.geocode(loc, timeout=10)
+    except (GeocoderTimedOut, GeocoderServiceError):
+        print(f"Error: Geocoding failed for {loc}")
+        location = None
+
+    if location is None:
+        # Returns the location name with NA values as per Exercise 3
+        return {"location": loc, "latitude": pd.NA, "longitude": pd.NA, "type": pd.NA}
     
-            return {"location": loc, "latitude": location.latitude, "longitude": location.longitude, "type": location.raw.get('type', None)}
-        except Exception as e:
-            print(f" {attempts} Attempts  failed for '{loc}': {e}")
-            time.sleep(2)
+    # ----------------------------------------------------------------------
+    # FIX: Change 'location.geo_type' to 'location.raw['type']'
+    # ----------------------------------------------------------------------
+    return {"location": loc, 
+            "latitude": location.latitude, 
+            "longitude": location.longitude, 
+            "type": location.raw['type']} # <--- CORRECTED LINE
 
-        print(f"Failed to fetch '{loc}' after {attempts} attempts.")
-        return None
-
-
-def build_geo_dataframe(geolocator, locations):
-
-    geo_data = [location_data for loc in locations
-        if (location_data := fetch_location_data(geolocator, loc)) is not None
-]
+def build_geo_dataframe(locations, geolocator): 
+    """
+    Builds a DataFrame from a list of locations using the geolocator.
+    """
+    geo_data = [fetch_location_data(geolocator, loc) for loc in locations]
     
-    return pd.DataFrame(geo_data)
+    df = pd.DataFrame.from_records(geo_data) 
+    
+    # Ensure correct dtypes in the final output
+    df['latitude'] = pd.to_numeric(df['latitude'], errors='coerce')
+    df['longitude'] = pd.to_numeric(df['longitude'], errors='coerce')
+
+    return df
 
 
 if __name__ == "__main__":
-    geo = get_geolocator()
+    geolocator = get_geolocator()
 
-    locations = ["Museum of Modern Art", "iuyt8765(*&)", "Alaska", "Franklin's Barbecue", "Burj Khalifa"]
+    locations = ["Museum of Modern Art", "iuyt8765(*&)", "Alaska", "Franklin's Barbecue", "Burj Khalifa", "asdfqwer1234"]
 
-    df = build_geo_dataframe(geo,locations)
+    df = build_geo_dataframe(locations, geolocator) 
 
-    df.to_csv("./geo_data.csv")
+    print(df)
+    df.to_csv("./geo_data.csv", index=False)
