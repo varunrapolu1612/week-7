@@ -1,83 +1,80 @@
 import unittest
+from unittest.mock import Mock
 import pandas as pd
-import numpy as np
-# Import everything needed from loader
-from loader import get_geolocator, fetch_location_data, build_geo_dataframe
 
-# Helper function for float comparison
-def assert_close(test_case, actual, expected, places=5):
-    """Asserts that two float values are close."""
-    return test_case.assertAlmostEqual(actual, expected, places=places)
+from loader import build_geo_dataframe, fetch_location_data
+
+
+class DummyLocation:
+    def __init__(self, lat: float, lon: float, feature_type: str):
+        self.latitude = lat
+        self.longitude = lon
+        self.raw = {"type": feature_type}
+
 
 class TestLoader(unittest.TestCase):
-
-    @classmethod
-    def setUpClass(cls):
-        """Set up geolocator once for all tests."""
-        cls.geolocator = get_geolocator()
-
-    # ------------------------------------------------------------------
-    # EXERCISE 2: Test valid locations
-    # ------------------------------------------------------------------
     def test_valid_locations(self):
-        # Known location data for testing
-        known_locations = {
-            "Museum of Modern Art": (40.7618552, -73.9782438, "museum"),
-            "USS Alabama Battleship Memorial Park": (30.684373, -88.015316, "park")
-        }
-        
-        locations_list = list(known_locations.keys())
-        
-        # ----------------------------------------------------------------------
-        # FIX #1: build_geo_dataframe now takes the geolocator argument.
-        # ----------------------------------------------------------------------
-        df = build_geo_dataframe(locations_list, self.geolocator) 
-        
-        self.assertEqual(len(df), len(locations_list), 
-                         "DataFrame should contain the correct number of locations.")
-        
-        # Check coordinates and types for each location
-        for loc in locations_list:
-            expected_lat, expected_lon, expected_type = known_locations[loc]
-            row = df[df['location'] == loc].iloc[0]
-            
-            assert_close(self, row['latitude'], expected_lat, places=2)
-            assert_close(self, row['longitude'], expected_lon, places=2)
-            
-            self.assertTrue(row['type'].lower().startswith(expected_type),
-                            f"Type for {loc} should start with '{expected_type}'. Got: {row['type']}")
+        """
+        Validate that the loader gathers known places (coords and type).
+        Uses a mocked geolocator for deterministic, fast tests.
+        """
+        geolocator = Mock()
+        # Side effects in the order of the locations list
+        geolocator.geocode.side_effect = [
+            DummyLocation(40.7618552, -73.9782438, "museum"),  # Museum of Modern Art
+            DummyLocation(30.684373, -88.015316, "park"),      # USS Alabama Battleship Memorial Park
+        ]
 
+        locations = [
+            "Museum of Modern Art",
+            "USS Alabama Battleship Memorial Park",
+        ]
+        df = build_geo_dataframe(locations, geolocator=geolocator)
 
-    # ------------------------------------------------------------------
-    # EXERCISE 3: Test invalid location (No need to change logic, just ensures arguments are passed)
-    # ------------------------------------------------------------------
+        # Exactly two rows
+        self.assertEqual(len(df), 2)
+        self.assertEqual(
+            list(df.columns), ["location", "latitude", "longitude", "feature_type"]
+        )
+
+        # Check values by location name
+        recs = {row["location"]: row for _, row in df.iterrows()}
+
+        moma = recs["Museum of Modern Art"]
+        self.assertAlmostEqual(moma["latitude"], 40.7618552, places=6)
+        self.assertAlmostEqual(moma["longitude"], -73.9782438, places=6)
+        self.assertIn("museum", str(moma["feature_type"]).lower())
+
+        uss = recs["USS Alabama Battleship Memorial Park"]
+        self.assertAlmostEqual(uss["latitude"], 30.684373, places=6)
+        self.assertAlmostEqual(uss["longitude"], -88.015316, places=6)
+        self.assertIn("park", str(uss["feature_type"]).lower())
+
+        # Ensure geocode was called with the expected strings
+        calls = [call.args[0] for call in geolocator.geocode.call_args_list]
+        self.assertEqual(calls, locations)
+
     def test_invalid_location(self):
-        # Invalid location string
-        invalid_loc = "asdfqwer1234" 
-        
-        # ----------------------------------------------------------------------
-        # FIX #2: fetch_location_data must be called with the geolocator instance.
-        # This prevents 'NoneType' error if fetch_location_data fails/returns None
-        # in an earlier/broken version, but with the corrected loader.py, 
-        # it will return the expected dictionary.
-        # ----------------------------------------------------------------------
-        result_dict = fetch_location_data(self.geolocator, invalid_loc)
+        """
+        Invalid locations should remain in the DataFrame with NA values
+        for latitude, longitude, and feature_type.
+        """
+        geolocator = Mock()
+        geolocator.geocode.return_value = None  # simulate not found
 
-        # 1. Check if the location name is preserved
-        self.assertEqual(result_dict.get('location'), invalid_loc, 
-                         "The location name must be preserved.")
+        invalid = "asdfqwer1234"
+        df = build_geo_dataframe([invalid], geolocator=geolocator)
 
-        # 2. Check for NA/NaN values in coordinates and type
-        # Using pd.isna() is the correct way to check for the pd.NA type.
-        self.assertTrue(pd.isna(result_dict.get('latitude')), 
-                        "Latitude for an invalid location must be NA.")
-        self.assertTrue(pd.isna(result_dict.get('longitude')), 
-                        "Longitude for an invalid location must be NA.")
-        self.assertTrue(pd.isna(result_dict.get('type')), 
-                        "Type for an invalid location must be NA.")
+        self.assertEqual(len(df), 1)
+        row = df.iloc[0]
+        self.assertEqual(row["location"], invalid)
+        self.assertTrue(pd.isna(row["latitude"]))
+        self.assertTrue(pd.isna(row["longitude"]))
+        self.assertTrue(pd.isna(row["feature_type"]))
+
+        # Also confirm fetch_location_data returns None in this case (unit-level)
+        self.assertIsNone(fetch_location_data(geolocator, invalid))
+
 
 if __name__ == "__main__":
-    unittest.main()
-
-
-    # python test_loader.py -v
+    unittest.main(verbosity=2)
